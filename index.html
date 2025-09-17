@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8">
+    <title>오늘의 문장</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <style>
+        body {
+            background-color: #fafaf5;
+            margin: 0;
+            padding: 0;
+            font-family: 'Courier New', Courier, monospace;
+            color: #222;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .slot-wrapper {
+            position: relative;
+            width: 360px;
+            height: 500px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            background-color: transparent;
+            border: none;
+            box-shadow: none;
+        }
+
+        .slot-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background-color: #333;
+            border-radius: 4px 4px 0 0;
+            z-index: 2;
+        }
+
+        .receipt {
+            position: absolute;
+            top: -110%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 340px;
+            border: 1px dashed #ccc;
+            padding: 20px 30px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            background-color: #fff;
+            animation: drop-in 1.2s ease-out forwards;
+            z-index: 1;
+        }
+
+        @keyframes drop-in {
+            to {
+                top: 12px;
+            }
+        }
+
+        .receipt .header {
+            font-size: 2em;
+            text-align: center;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .receipt .order-info {
+            font-size: 0.85em;
+            margin-top: 8px;
+            text-align: left;
+        }
+
+        .receipt .datetime {
+            font-size: 0.85em;
+            margin-top: 2px;
+            text-align: left;
+        }
+
+        .receipt .stars {
+            margin: 12px 0;
+            text-align: center;
+            letter-spacing: 2px;
+            white-space: nowrap;
+        }
+
+        .receipt .quote {
+            font-size: 1.1em;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .receipt .author-title {
+            font-size: 0.9em;
+            margin-bottom: 15px;
+            text-align: right;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+
+        .receipt .barcode {
+            height: 50px;
+            width: 66%;
+            margin: 10px auto;
+            background-image: repeating-linear-gradient(90deg,
+                    #000 0 4px,
+                    transparent 4px 6px,
+                    #000 6px 11px,
+                    transparent 11px 14px,
+                    #000 14px 20px,
+                    transparent 20px 23px);
+            background-size: 100% 100%;
+        }
+
+        .receipt .thankyou {
+            font-size: 0.85em;
+            text-align: center;
+            margin-top: 5px;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="slot-wrapper">
+        <div class="slot-bar"></div>
+        <div class="receipt">
+            <div class="header">Shelfie.</div>
+            <div class="order-info" id="order-info"></div>
+            <div class="datetime" id="datetime"></div>
+            <div class="stars">**************************************************</div>
+            <div class="quote" id="quote"></div>
+            <div class="author-title" id="author-title"></div>
+            <div class="stars">**************************************************</div>
+            <div class="barcode"></div>
+            <div class="thankyou">Thank you for visiting!<br />See you tomorrow &lt;3</div>
+        </div>
+    </div>
+
+    <script>
+        // 문장 데이터 (JSON 하드코딩)
+        const SENTENCES = [
+            { "text": "삶은 거울과 같아서, 우리의 얼굴을 그대로 반영한다.", "book_title": "인생에 관하여", "author": "김연수" },
+            { "text": "작은 습관 하나가 미래를 바꾼다.", "book_title": "습관의 힘", "author": "찰스 두히그" },
+            { "text": "눈에 보이지 않는 것을 믿는 것이야말로 가장 큰 용기다.", "book_title": "어둠 속의 길", "author": "허먼 멜빌" },
+            { "text": "과거에 머무르지 말고, 앞으로 나아갈 길을 바라보라.", "book_title": "오늘을 살아라", "author": "마크 트웨인" },
+            { "text": "모험을 두려워하지 않는 사람만이 새로운 세계를 발견한다.", "book_title": "미지의 길", "author": "잭 런던" }
+        ];
+
+        // 쿠키 파서
+        function getCookies() {
+            return document.cookie.split(';').reduce((acc, part) => {
+                const [k, v] = part.trim().split('=');
+                if (k && v) acc[k] = v;
+                return acc;
+            }, {});
+        }
+
+        // 오늘 날짜 문자열 (Asia/Seoul)
+        function currentDateStr() {
+            const now = new Date();
+            const tzOffset = now.getTimezoneOffset() * 60000;
+            const seoul = new Date(now.getTime() + tzOffset + 9 * 3600000);
+            return seoul.toISOString().slice(0, 10);
+        }
+
+        // 시드 기반 랜덤 (하루 동안 고정)
+        function seededRandom(seed) {
+            let h = 0;
+            for (let i = 0; i < seed.length; i++) {
+                h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
+            }
+            return () => {
+                h = Math.imul(48271, h) % 0x7fffffff;
+                return (h & 0x7fffffff) / 0x7fffffff;
+            };
+        }
+
+        // 메인 로직
+        (function () {
+            const dateStr = currentDateStr();
+            const cookies = getCookies();
+
+            let idx = null;
+            if (cookies.sentence_date === dateStr && cookies.sentence_id) {
+                const ci = parseInt(cookies.sentence_id);
+                if (!isNaN(ci) && ci >= 0 && ci < SENTENCES.length) idx = ci;
+            }
+
+            if (idx === null) {
+                const rnd = seededRandom(dateStr + navigator.userAgent);
+                idx = Math.floor(rnd() * SENTENCES.length);
+                document.cookie = `sentence_id=${idx}; path=/; max-age=86400; samesite=lax`;
+                document.cookie = `sentence_date=${dateStr}; path=/; max-age=86400; samesite=lax`;
+            }
+
+            const sentence = SENTENCES[idx];
+            document.getElementById("quote").textContent = sentence.text;
+            document.getElementById("author-title").textContent = `${sentence.author} - ${sentence.book_title}`;
+
+            // 방문 순번은 로컬스토리지 기반
+            let count = parseInt(localStorage.getItem("visit_count") || "0");
+            count += 1;
+            localStorage.setItem("visit_count", count);
+            document.getElementById("order-info").textContent = `ORDER #${String(count).padStart(4, '0')} FOR YOU <3`;
+
+            // 시간 문자열
+            const now = new Date();
+            const tzOffset = now.getTimezoneOffset() * 60000;
+            const seoul = new Date(now.getTime() + tzOffset + 9 * 3600000);
+            const options = { weekday: 'short', year: 'numeric', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false };
+            document.getElementById("datetime").textContent =
+                seoul.toLocaleString('en-US', options).toUpperCase();
+        })();
+    </script>
+</body>
+
+</html>
